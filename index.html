@@ -1383,8 +1383,33 @@ async function init() {
   var njb = document.getElementById('btnNewJob');
   if (njb) njb.onclick = function() { navigate('add'); };
   document.getElementById('page').innerHTML='<div class="loading"><div class="spinner"></div>กำลังโหลด...</div>';
+  // เปิดซ้ำ: แสดงข้อมูลชุดล่าสุดที่เก็บไว้ในเครื่องทันที แล้วโหลดของใหม่เบื้องหลัง
+  var month = thisMonth(), jobsKey = 'getJobs' + JSON.stringify({ month: month });
+  var applyBoot = function(b) {
+    if (b.settings) { State.settings = b.settings; applyTheme(b.settings); cacheSet('getSettings{}', { ok: true, data: b.settings }); }
+    if (b.users) { State.users = b.users; cacheSet('getUsers{}', { ok: true, data: b.users }); }
+    if (b.departments) { State.departments = b.departments; cacheSet('getDepartments{}', { ok: true, data: b.departments }); }
+    if (b.jobs) cacheSet(jobsKey, { ok: true, data: b.jobs }, 30000);
+  };
+  var snap = null;
+  try { snap = JSON.parse(localStorage.getItem('ms_boot_v1') || 'null'); } catch (_) {}
+  var hasSnap = !!(snap && snap.month === month && snap.data);
+  if (hasSnap) {
+    applyBoot(snap.data);
+    navigate('home');
+  }
+  var boot = await api('bootstrap', { month: month });
+  if (boot && boot.ok && boot.data) {
+    applyBoot(boot.data);
+    _homeLastUpdated = Date.now();
+    try { localStorage.setItem('ms_boot_v1', JSON.stringify({ month: month, data: boot.data })); } catch (_) {}
+    if (!hasSnap) navigate('home');
+    else if (State.page === 'home') _renderHomePage(boot.data.jobs);   // popup อยู่ใน #modalMount แยกจาก #page จึงไม่ถูกปิด
+    return;
+  }
+  if (hasSnap) return;   // มีข้อมูลในเครื่องแสดงอยู่แล้ว
   try {
-    // Parallel fetch — ลดเวลาจาก 3x เป็น 1x round-trip
+    // สำรอง (backend เก่าที่ยังไม่มี action bootstrap): โหลดแยก 4 request
     var results = await Promise.all([
       api('getSettings'),
       api('getUsers'),
