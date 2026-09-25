@@ -1253,6 +1253,56 @@ const State = {
   adminToken: localStorage.getItem('adminToken') || '',
   adminUser:  localStorage.getItem('adminUser')  || ''
 };
+// ── LINE Login (LIFF) ────────────────────────────────────────
+// เปิดใน LINE → ได้ ID token → แลกเป็น session ของระบบ (ms_ut อายุ 30 วัน) · Apps Script บังคับล็อกอินเมื่อ REQUIRE_LINE_AUTH=1
+var LIFF_ID = '2011406214-sWLbZ2YG';
+function getUserToken() { try { return localStorage.getItem('ms_ut') || ''; } catch (_) { return ''; } }
+var _lineAuthP = null;
+function lineAuth(interactive) {
+  if (_lineAuthP && !interactive) return _lineAuthP;
+  _lineAuthP = (async function() {
+    if (!window.liff) return false;
+    try {
+      await Promise.race([liff.init({ liffId: LIFF_ID }), new Promise(function(_, rej) { setTimeout(function() { rej(new Error('liff timeout')); }, 8000); })]);
+    } catch (e) { console.warn('liff.init', e); return false; }
+    if (!liff.isLoggedIn()) {
+      if (interactive || liff.isInClient()) liff.login({ redirectUri: location.href.replace(/[?&]web=1\b/, '') });
+      return false;
+    }
+    if (getUserToken() && !interactive) return true;
+    var idt = ''; try { idt = liff.getIDToken() || ''; } catch (_) {}
+    if (!idt) return false;
+    var r = await api('lineLogin', { idToken: idt });
+    if (r && r.ok) {
+      try { localStorage.setItem('ms_ut', r.data.token); localStorage.setItem('ms_line_name', r.data.name || ''); } catch (_) {}
+      return true;
+    }
+    return false;
+  })();
+  return _lineAuthP;
+}
+var _authGateShown = false;
+function onAuthRequired() {
+  try { localStorage.removeItem('ms_ut'); } catch (_) {}
+  if (_authGateShown) return; _authGateShown = true;
+  lineAuth().then(function(ok) { if (ok) location.reload(); else showLineLoginGate(); });
+}
+function showLineLoginGate() {
+  if (document.getElementById('line-gate')) return;
+  var g = document.createElement('div');
+  g.id = 'line-gate';
+  g.style.cssText = 'position:fixed;inset:0;z-index:9999;background:#F8FAFC;display:flex;align-items:center;justify-content:center;padding:24px;font-family:inherit;';
+  g.innerHTML = '<div style="max-width:360px;width:100%;text-align:center">' +
+    '<img src="apple-touch-icon.png?v=4" alt="" style="width:64px;height:64px;border-radius:16px">' +
+    '<div style="font-size:19px;font-weight:800;margin-top:14px">เข้าสู่ระบบ Messenger System</div>' +
+    '<div style="font-size:14px;color:#64748B;margin-top:6px;line-height:1.6">กรุณาเข้าสู่ระบบด้วยบัญชี LINE ก่อนใช้งาน</div>' +
+    '<button id="lg-btn" type="button" style="display:block;width:100%;margin-top:20px;padding:13px;border:0;border-radius:12px;background:#06C755;color:#fff;font-size:15px;font-weight:700;font-family:inherit;cursor:pointer">เข้าสู่ระบบด้วย LINE</button>' +
+    '<a href="#" id="lg-admin" style="display:inline-block;margin-top:14px;font-size:13px;color:#64748B">เข้าสู่ระบบแอดมิน</a></div>';
+  document.body.appendChild(g);
+  document.getElementById('lg-btn').onclick = function() { lineAuth(true); };
+  document.getElementById('lg-admin').onclick = function(ev) { ev.preventDefault(); g.remove(); _authGateShown = false; navigate('admin'); };
+}
+
 // Apps Script Web App (API backend) — ใช้เมื่อหน้าเว็บเปิดจาก GitHub Pages
 var GAS_URL = 'https://script.google.com/macros/s/AKfycbxh5PVMG7TMpknhPE4XB7AS5M542e_KR8Os8Gjxe_198WtM5VQInny1wQ7RZUb4Rg08/exec';
 function api(action, params) {
@@ -1265,19 +1315,35 @@ function api(action, params) {
       }
     });
     var _done = false;
+    // ยืนยันตัวตน: session จาก LINE (ut) + token แอดมิน (ถ้ามี)
+    var _ut = getUserToken();
+    if (_ut && !data.ut) data.ut = _ut;
+    if (State.adminToken && !data.token) data.token = State.adminToken;
+    var _fin = function(result) {
+      if (_done) return; _done = true;
+      if (result && result.error === 'AUTH_REQUIRED') onAuthRequired();
+      resolve(result);
+    };
     // เปิดจาก GitHub Pages (ไม่มี google.script.run) → เรียก Apps Script ผ่าน fetch POST (form-urlencoded = ไม่มี CORS preflight)
     if (!(window.google && google.script && google.script.run)) {
-      var _t = setTimeout(function() {
-        if (!_done) { _done = true; resolve({ ok: false, error: 'timeout:'+action }); }
-      }, 25000);
-      fetch(GAS_URL, { method: 'POST', body: new URLSearchParams(data) })
-        .then(function(res) { return res.json(); })
-        .then(function(result) {
-          if (!_done) { _done = true; clearTimeout(_t); resolve(result || { ok: false, error: 'No response' }); }
-        })
-        .catch(function(err) {
-          if (!_done) { _done = true; clearTimeout(_t); resolve({ ok: false, error: 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ กรุณาลองใหม่' }); }
-        });
+      var _t = setTimeout(function() { _fin({ ok: false, error: 'timeout:'+action }); }, 25000);
+      // Apps Script บางครั้งตอบหน้า error ของ Google (ไม่ใช่ JSON) → คำสั่งอ่านลองใหม่อีก 1 ครั้ง (คำสั่งเขียนไม่ลองซ้ำ กันบันทึกซ้ำ)
+      var _canRetry = /^(get|bootstrap$|adminverify$)/i.test(action);
+      var _try = function(n) {
+        fetch(GAS_URL, { method: 'POST', body: new URLSearchParams(data) })
+          .then(function(res) { return res.text(); })
+          .then(function(txt) {
+            var j = null; try { j = JSON.parse(txt); } catch (_) {}
+            if (j) { clearTimeout(_t); _fin(j); }
+            else if (_canRetry && n < 1) setTimeout(function() { _try(n + 1); }, 600);
+            else { clearTimeout(_t); _fin({ ok: false, error: 'เซิร์ฟเวอร์ไม่ตอบสนอง กรุณาลองใหม่' }); }
+          })
+          .catch(function() {
+            if (_canRetry && n < 1) setTimeout(function() { _try(n + 1); }, 600);
+            else { clearTimeout(_t); _fin({ ok: false, error: 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ กรุณาลองใหม่' }); }
+          });
+      };
+      _try(0);
       return;
     }
     var _timer = setTimeout(function() {
@@ -1285,7 +1351,7 @@ function api(action, params) {
     }, 12000);
     google.script.run
       .withSuccessHandler(function(result) {
-        if (!_done) { _done = true; clearTimeout(_timer); resolve(result || { ok: false, error: 'No response' }); }
+        clearTimeout(_timer); _fin(result || { ok: false, error: 'No response' });
       })
       .withFailureHandler(function(err) {
         if (!_done) { _done = true; clearTimeout(_timer); resolve({ ok: false, error: err.message || String(err) }); }
@@ -1398,7 +1464,9 @@ async function init() {
     applyBoot(snap.data);
     navigate('home');
   }
+  if (!getUserToken()) lineAuth();   // เปิดใน LINE → เก็บ session ไว้เงียบๆ (ใช้เมื่อเปิดบังคับล็อกอิน)
   var boot = await api('bootstrap', { month: month });
+  if (boot && boot.error === 'AUTH_REQUIRED') return;   // onAuthRequired() จัดการต่อ (ล็อกอินแล้วโหลดใหม่ / แสดงหน้าล็อกอิน)
   if (boot && boot.ok && boot.data) {
     applyBoot(boot.data);
     _homeLastUpdated = Date.now();
@@ -3327,10 +3395,28 @@ async function loadAdmins(){
       <div class="form-group"><label class="form-label">Password (min 6 chars)</label><input id="newAdminPass" type="password" class="form-input" placeholder="password"></div>
     </div>
     <button class="btn btn-primary" onclick="addAdmin()">➕ เพิ่ม Admin</button>
+    <button class="btn" style="margin-left:8px" onclick="openChangeAdminPassword()">🔑 เปลี่ยนรหัสผ่านของฉัน</button>
     <div class="table-wrap" style="margin-top:18px"><table><thead><tr><th>Username</th><th>Role</th><th>Created</th><th style="width:80px">Actions</th></tr></thead>
     <tbody>${list.map(a=>`<tr><td><div style="display:flex;align-items:center;gap:10px"><div class="user-avatar" style="width:30px;height:30px;font-size:12px">${getInitials(a.username)}</div><strong>${escapeHtml(a.username)}</strong>${a.username===State.adminUser?' <span style="font-size:10px;color:var(--success);font-weight:700">(คุณ)</span>':''}</div></td><td><span class="job-tag">${escapeHtml(a.role)}</span></td><td style="font-size:12px;color:var(--text-muted)">${escapeHtml(a.createdAt)}</td><td>${a.username===State.adminUser?'<span style="color:var(--text-light)">-</span>':`<button class="btn btn-danger btn-sm" onclick="deleteAdmin('${escapeHtml(a.username)}')">🗑️</button>`}</td></tr>`).join('')}</tbody>
     </table></div></div>`;}
 async function addAdmin(){const username=document.getElementById('newAdminUser').value.trim();const password=document.getElementById('newAdminPass').value;if(!username||!password)return toast('Please enter a username/password','warning');const r=await api('addAdmin',{token:State.adminToken,username,password});if(r.ok){toast('Admin added');loadAdmins();}else toast(r.error,'error');}
+function openChangeAdminPassword(){
+  showModal('เปลี่ยนรหัสผ่าน ('+(State.adminUser||'')+')',
+    '<div class="form-group"><label class="form-label">รหัสผ่านเดิม</label><input id="cpCur" type="password" class="form-input" autocomplete="current-password"></div>'+
+    '<div class="form-group"><label class="form-label">รหัสผ่านใหม่ (อย่างน้อย 8 ตัวอักษร)</label><input id="cpNew" type="password" class="form-input" autocomplete="new-password"></div>'+
+    '<div class="form-group"><label class="form-label">ยืนยันรหัสผ่านใหม่</label><input id="cpNew2" type="password" class="form-input" autocomplete="new-password"></div>'+
+    '<button class="btn btn-primary" id="cpBtn" onclick="submitChangeAdminPassword()">บันทึกรหัสผ่านใหม่</button>');
+}
+async function submitChangeAdminPassword(){
+  const cur=document.getElementById('cpCur').value, nw=document.getElementById('cpNew').value, nw2=document.getElementById('cpNew2').value;
+  if(!cur||!nw) return toast('กรุณากรอกข้อมูลให้ครบ','warning');
+  if(nw.length<8) return toast('รหัสผ่านใหม่ต้องมีอย่างน้อย 8 ตัวอักษร','warning');
+  if(nw!==nw2) return toast('รหัสผ่านใหม่ทั้งสองช่องไม่ตรงกัน','warning');
+  const btn=document.getElementById('cpBtn'); btn.disabled=true; btn.textContent='กำลังบันทึก...';
+  const r=await api('changeAdminPassword',{username:State.adminUser,currentPassword:cur,newPassword:nw});
+  btn.disabled=false; btn.textContent='บันทึกรหัสผ่านใหม่';
+  if(r.ok){ closeModal(); toast('เปลี่ยนรหัสผ่านแล้ว'); } else toast(r.error||'เปลี่ยนรหัสผ่านไม่สำเร็จ','error');
+}
 async function deleteAdmin(username){if(!confirm(`ลบ admin "${username}" ?`))return;const r=await api('deleteAdmin',{token:State.adminToken,username});if(r.ok){toast('Deleted');loadAdmins();}else toast(r.error,'error');}
 // ── Profile ──────────────────────────────────────────────────
 async function loadProfile(){
