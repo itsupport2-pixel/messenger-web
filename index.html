@@ -18,6 +18,44 @@
 <meta property="og:image:height" content="800">
 <meta name="twitter:card" content="summary">
 <base target="_top">
+<script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<script>
+// เปิดลิงก์ github.io บนมือถือ / ในเบราว์เซอร์ของ LINE → ส่งต่อให้แอป LINE เปิดเป็นหน้าต่าง LIFF
+// (line.me/R/app/ = เปิดหน้าต่าง LIFF จริง · liff.line.me จะเปิดต่อในเบราว์เซอร์เดิม)
+// กันวน: ข้ามถ้าอยู่ในหน้าต่าง LIFF แล้ว / URL มาจาก LIFF / เคยส่งต่อแล้วในแท็บนี้ / ?web=1 = ใช้ในเบราว์เซอร์ต่อ
+(function() {
+  var LIFF_ID = '2011406214-sWLbZ2YG';
+  var APP_URL = 'https://line.me/R/app/' + LIFF_ID;
+  var ua = navigator.userAgent || '';
+  var qs = location.search || '';
+  var inLiff = /\bLIFF\b/.test(ua);
+  try { if (window.liff && liff.isInClient()) inLiff = true; } catch (_) {}
+  var isLine = /\bLine\//i.test(ua);
+  var isMobile = /Android|iPhone|iPad|iPod/i.test(ua);
+  var fromLiff = /liff\.state|liffClientId|liffRedirectUri|liffIsEscapedFromApp/.test(qs);
+  var ss = function(k, v) { try { if (v === undefined) return sessionStorage.getItem(k); sessionStorage.setItem(k, v); } catch (_) {} };
+  if (/[?&]web=1\b/.test(qs)) ss('ms_web', '1');
+  if (inLiff || fromLiff || !(isLine || isMobile) || ss('ms_web') === '1' || ss('ms_liff_jump') === '1') return;
+  ss('ms_liff_jump', '1');
+  // หน้านี้อาจค้างอยู่ใต้หน้าต่าง LIFF (หรือกลับมาหน้านี้ถ้าเครื่องไม่มีแอป LINE) → แสดงหน้าแนะนำแทนหน้าระบบ
+  document.addEventListener('DOMContentLoaded', function() {
+    var ov = document.createElement('div');
+    ov.id = 'liff-jump';
+    ov.style.cssText = 'position:fixed;inset:0;z-index:99999;overflow-y:auto;background:#F4F5F9;color:#1A1F2E;font-family:-apple-system,BlinkMacSystemFont,\'Helvetica Neue\',\'Thonburi\',\'Noto Sans Thai\',Roboto,sans-serif;';
+    ov.innerHTML =
+      '<div style="max-width:420px;margin:0 auto;padding:48px 22px 32px;text-align:center;">' +
+        '<img src="apple-touch-icon.png?v=4" alt="" style="width:64px;height:64px;border-radius:16px;">' +
+        '<div style="font-size:13px;color:#6B7280;margin-top:10px;">Messenger System</div>' +
+        '<div style="font-size:19px;font-weight:800;margin-top:14px;">กำลังเปิดระบบในแอป LINE</div>' +
+        '<div style="font-size:14px;color:#6B7280;line-height:1.6;margin-top:6px;">ถ้าแอป LINE เปิดขึ้นมาแล้ว หน้านี้ปิดได้เลย</div>' +
+        '<a href="' + APP_URL + '" style="display:block;margin-top:20px;padding:13px;border-radius:12px;background:#06C755;color:#fff;font-size:15px;font-weight:700;text-decoration:none;">เปิดในแอป LINE</a>' +
+        '<a href="?web=1" target="_self" style="display:block;margin-top:10px;padding:12px;border-radius:12px;border:1px solid #D1D5DB;background:#fff;color:#1A1F2E;font-size:15px;font-weight:600;text-decoration:none;">ใช้งานในเบราว์เซอร์นี้แทน</a>' +
+      '</div>';
+    document.body.appendChild(ov);
+  });
+  location.replace(APP_URL);
+})();
+</script>
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
