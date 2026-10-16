@@ -1088,6 +1088,33 @@ input[type="date"]{
   .print-table th{background:#F1F5F9}
   @page{size:A4 landscape;margin:14mm}
 }
+
+/* ── 16 ต.ค. 2569: ตัดแถบสีด้านซ้ายการ์ดตัวเลข + จัดโหมดมือถือใหม่ ── */
+.hm-kpi-accent{display:none!important}
+.kpi-card{border-left-width:1px!important;border-left-color:#EEF2F7!important}
+.stat-card{border-left-width:1px!important;border-left-color:#E8EDF2!important}
+@media(max-width:768px){
+  .fab{display:none!important}  /* มีปุ่ม New ในแถบล่างอยู่แล้ว — กันทับปุ่ม View all */
+  /* หน้าแผนที่: ไม่ให้เลื่อนไปซ่อนใต้แถบบน/แถบล่าง · แผนที่อยู่บน รายการงานอยู่ล่าง */
+  .map-page{height:calc(100dvh - 54px - 76px - env(safe-area-inset-bottom,0px))!important}
+  .map-body{flex-direction:column}
+  #mapContainer{order:1;flex:0 0 48%;min-height:0!important;width:100%}
+  .map-sidebar{order:2;flex:1 1 auto;width:100%!important;height:auto!important;min-height:0;border-bottom:none!important;border-top:1px solid var(--border)}
+  .map-sidebar-head{padding:10px 14px 8px}
+  .map-route-info-sidebar{padding:10px 14px!important}
+  .map-route-dist{font-size:26px!important}
+}
+@media(max-width:600px){
+  /* หน้าแรก: การ์ดตัวเลขใหญ่ → แถบตัวเลขเล็กแนวนอน (กดกรองได้เหมือนเดิม) */
+  .hm-kpi-grid{display:flex!important;gap:8px;overflow-x:auto;margin:0 -16px 14px;padding:2px 16px 4px;scrollbar-width:none}
+  .hm-kpi-grid::-webkit-scrollbar{display:none}
+  .hm-kpi{flex:0 0 auto;flex-direction:row!important;align-items:baseline;gap:7px;padding:9px 14px!important;border-radius:999px!important;box-shadow:none!important;transform:none!important;border:1px solid #E2E8F0}
+  .hm-kpi.stat-card-active{border-color:currentColor;background:#F8FAFC}
+  .hm-kpi-icon,.hm-kpi-sub,.hm-kpi-footer{display:none!important}
+  .hm-kpi-top{order:2;margin:0!important}
+  .hm-kpi-label{font-size:10.5px;color:#64748B;letter-spacing:.04em}
+  .hm-kpi-val{font-size:18px!important;margin:0!important;letter-spacing:0}
+}
 </style>
 </head>
 <body>
