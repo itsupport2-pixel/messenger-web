@@ -2894,7 +2894,7 @@ function renderAdminPanel(){
 }
 function switchAdminTab(tab){adminTab=tab;renderAdminPanel();}
 async function loadAdminTab(){
-  const c=document.getElementById('adminTabContent');
+  const c=document.getElementById('adminTabContent');if(!c)return;
   c.innerHTML='<div class="loading"><div class="spinner"></div>Loading...</div>';
   switch(adminTab){
     case 'dashboard':return loadDashboard();
@@ -2920,7 +2920,7 @@ function dashOpenDrp(){
   drpRenderSidebar(); drpRenderCals();
 }
 async function loadDashboard(){
-  var c=document.getElementById('adminTabContent');
+  var c=document.getElementById('adminTabContent');if(!c)return;
   var now=new Date();
   var dateTH=now.toLocaleDateString('th-TH',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
   c.innerHTML=
@@ -3270,7 +3270,7 @@ function dashClosePanel(){
 async function loadUsers(){
   const r=await apiCached('getUsers',{},20000);
   const list=r.ok?r.data:[];
-  document.getElementById('adminTabContent').innerHTML=`
+  (document.getElementById('adminTabContent')||{}).innerHTML=`
     <div class="card">
       <div class="section-head"><h3 class="card-title" style="margin:0">👤 จัดการผู้บันทึก</h3><button class="btn btn-primary btn-sm" onclick="showAddUserModal()">➕ เพิ่มผู้ใช้ใหม่</button></div>
       ${!r.ok?showApiError(r.error):''}
@@ -3317,7 +3317,7 @@ async function deleteUser(name){if(!confirm(`ลบผู้ใช้ "${name}" 
 // ── Departments ──────────────────────────────────────────────
 async function loadDepts(){
   const r=await apiCached('getDepartments',{},20000);const list=r.ok?r.data:[];
-  document.getElementById('adminTabContent').innerHTML=`<div class="card"><h3 class="card-title">Manage Departments</h3>
+  (document.getElementById('adminTabContent')||{}).innerHTML=`<div class="card"><h3 class="card-title">Manage Departments</h3>
     <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center">
       <input id="newDeptName" class="form-input" placeholder="New department name" style="flex:1;min-width:160px">
       <input type="color" id="newDeptColor" class="form-input" value="#2563EB" style="width:60px;padding:4px;cursor:pointer">
@@ -3356,7 +3356,7 @@ async function deleteDept(name){if(!confirm(`ลบแผนก "${name}" ?`))re
 // ── Settings ─────────────────────────────────────────────────
 async function loadSettings(){
   const r=await apiCached('getSettings',{},20000);const s=r.ok?r.data:{};
-  document.getElementById('adminTabContent').innerHTML=`<div class="card"><h3 class="card-title">Appearance</h3>
+  (document.getElementById('adminTabContent')||{}).innerHTML=`<div class="card"><h3 class="card-title">Appearance</h3>
     <div class="form-group"><label class="form-label">Company Name <span style="font-size:11px;color:var(--text-muted);font-weight:400">(บรรทัดบน — ชื่อบริษัท)</span></label><input id="setCompany" class="form-input" value="${escapeHtml(s.companyName||'')}"></div>
     <div class="form-group"><label class="form-label">System Name <span style="font-size:11px;color:var(--text-muted);font-weight:400">(บรรทัดล่าง — ชื่อระบบ เช่น Messenger System)</span></label><input id="setSystemName" class="form-input" value="${escapeHtml(s.systemName||'')}" placeholder="เช่น Messenger System, HR Portal..."></div>
     <div class="form-row">
@@ -3416,7 +3416,7 @@ async function saveSettings(){
 // ── Admins ───────────────────────────────────────────────────
 async function loadAdmins(){
   const r=await api('getAdmins',{token:State.adminToken});const list=r.ok?r.data:[];
-  document.getElementById('adminTabContent').innerHTML=`<div class="card"><h3 class="card-title">Manage Admins</h3>
+  (document.getElementById('adminTabContent')||{}).innerHTML=`<div class="card"><h3 class="card-title">Manage Admins</h3>
     <div class="form-row">
       <div class="form-group"><label class="form-label">New Username</label><input id="newAdminUser" class="form-input" placeholder="username"></div>
       <div class="form-group"><label class="form-label">Password (min 6 chars)</label><input id="newAdminPass" type="password" class="form-input" placeholder="password"></div>
@@ -3448,7 +3448,7 @@ async function deleteAdmin(username){if(!confirm(`ลบ admin "${username}" ?`)
 // ── Profile ──────────────────────────────────────────────────
 async function loadProfile(){
   const saved=JSON.parse(localStorage.getItem('userProfile_'+State.adminUser)||'{}');
-  const c=document.getElementById('adminTabContent');
+  const c=document.getElementById('adminTabContent');if(!c)return;
   c.innerHTML=`<div class="card" style="max-width:480px;margin:0 auto"><h3 class="card-title">🧑 ข้อมูลส่วนตัว</h3>
     <div style="text-align:center;margin-bottom:20px">
       <div class="profile-avatar" onclick="document.getElementById('avatarFile').click()" id="avatarBox">
@@ -3476,14 +3476,14 @@ function saveProfile(){const avatarBox=document.getElementById('avatarBox');cons
 // ── Logs ─────────────────────────────────────────────────────
 async function loadLogs(){
   const r=await api('getLogs',{token:State.adminToken,limit:200});const list=r.ok?r.data:[];
-  document.getElementById('adminTabContent').innerHTML=`<div class="card"><h3 class="card-title">📜 ประวัติการใช้งาน <span style="font-size:11px;color:var(--text-muted);font-weight:500">(200 ล่าสุด)</span></h3>
+  (document.getElementById('adminTabContent')||{}).innerHTML=`<div class="card"><h3 class="card-title">📜 ประวัติการใช้งาน <span style="font-size:11px;color:var(--text-muted);font-weight:500">(200 ล่าสุด)</span></h3>
     ${!r.ok?showApiError(r.error):''}
     <div class="table-wrap"><table><thead><tr><th style="width:170px">Time</th><th style="width:170px">Action</th><th>Detail</th></tr></thead>
     <tbody>${list.length?list.map(l=>`<tr><td style="font-size:11px;color:var(--text-muted)">${escapeHtml(l.timestamp)}</td><td><span class="job-tag" style="background:#EFF6FF;color:var(--primary);border-color:#DBEAFE">${escapeHtml(l.action)}</span></td><td style="font-size:12px">${escapeHtml(l.detail)}</td></tr>`).join(''):'<tr><td colspan="3" style="text-align:center;color:var(--text-muted);padding:40px">ยังไม่มี log</td></tr>'}</tbody>
     </table></div></div>`;}
 // ── Export (Date Range Picker) ───────────────────────────────
 async function loadExport(){
-  document.getElementById('adminTabContent').innerHTML=`<div class="card"><h3 class="card-title">📥 Export ข้อมูล</h3>
+  (document.getElementById('adminTabContent')||{}).innerHTML=`<div class="card"><h3 class="card-title">📥 Export ข้อมูล</h3>
     <div class="form-group">
       <label class="form-label">Select Date Range</label>
       <button class="drp-btn" id="expDrpBtn" onclick="drpOpen(function(s,e){document.getElementById('expDrpBtn').innerHTML='📅 '+s+' — '+e;})">
